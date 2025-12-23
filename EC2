@@ -1,0 +1,351 @@
+AWS Certified Solutions Architect Associate: EC2 Study Notes
+
+1. What is an EC2 Instance?
+Amazon Elastic Compute Cloud (EC2) provides scalable computing capacity in the AWS Cloud. It eliminates the need to invest in hardware up front, so you can develop and deploy applications faster.
+Virtual Machine: An EC2 instance is essentially a virtual server.
+Highly Configurable: You choose the OS, CPU, RAM, and Storage.
+It mainly consists in the capability of :
+• Renting virtual machines (EC2)
+• Storing data on virtual drives (EBS)
+• Distributing load across machines (ELB)
+• Scaling the services using an auto-scaling group (ASG)
+
+EC2 sizing & configuration options
+• Operating System (OS): Linux, Windows or Mac OS
+• How much compute power & cores (CPU)
+• How much random-access memory (RAM)
+• How much storage space:
+• Network-attached (EBS & EFS)
+• hardware (EC2 Instance Store)
+• Network card: speed of the card, Public IP address
+• Firewall rules: security group
+• Bootstrap script (configure at first launch): EC2 User Data
+
+EC2 User Data
+• It is possible to bootstrap our instances using an EC2 User data script.
+• bootstrapping means launching commands when a machine starts
+• That script is only run once at the instance first start
+• EC2 user data is used to automate boot tasks such as:
+  • Installing updates
+  • Installing software
+  • Downloading common files from the internet
+  • Anything you can think of
+• The EC2 User Data Script runs with the root user
+
+2. EC2 Instance Types
+AWS categorizes instances based on use cases. Remember the acronym "FIGHT DR MC PX" or focus on these main categories:
+
+1.General Purpose: Balanced CPU, memory, and networking (e.g., t3, m5).
+2.Compute Optimized: High-performance processors; ideal for batch processing or gaming servers (e.g., c5).
+3.Memory Optimized: Fast performance for workloads that process large data sets in memory (e.g., r5).
+4.Storage Optimized: High, sequential read/write access to very large data sets (e.g., i3).
+5.Accelerated Computing: Uses hardware accelerators (GPUs) for graphics or AI (e.g., p3).
+
+3. Security Groups
+Security groups act as a virtual firewall for your instance to control inbound and outbound traffic.
+Stateful: If you send a request from your instance, the response traffic is allowed in regardless of inbound rules.
+Default Behavior: All Inbound is blocked by default; All Outbound is allowed by default.
+Rules: You can only allow rules; you cannot deny specific IP addresses (use Network ACLs for that).
+
+• Security groups are acting as a “firewall” on EC2 instances
+• They regulate:
+  • Access to Ports
+  • Authorised IP ranges – IPv4 and IPv6
+  • Control of inbound network (from other to the instance)
+  • Control of outbound network (from the instance to other)
+
+Security Groups
+Good to know
+• Can be attached to multiple instances
+• Locked down to a region / VPC combination
+• Does live “outside” the EC2 – if traffic is blocked the EC2 instance won’t see it
+• It’s good to maintain one separate security group for SSH access
+• If your application is not accessible (time out), then it’s a security group issue
+• If your application gives a “connection refused“ error, then it’s an application
+error or it’s not launched
+• All inbound traffic is blocked by default
+• All outbound traffic is authorised by default
+
+Classic Ports to know
+• 22 = SSH (Secure Shell) - log into a Linux instance
+• 21 = FTP (File Transfer Protocol) – upload files into a file share
+• 22 = SFTP (Secure File Transfer Protocol) – upload files using SSH
+• 80 = HTTP – access unsecured websites
+• 443 = HTTPS – access secured websites
+• 3389 = RDP (Remote Desktop Protocol) – log into a Windows instance
+
+4. SSH (Secure Shell)
+A network protocol that gives users a secure way to access a computer over an unsecured network.
+Port: Default port is 22.
+Authentication: Uses Key Pairs (Private Key .pem or .ppk and Public Key stored on AWS).
+
+(.pem vs .ppk: Key Differences
+== .pem (Privacy Enhanced Mail)
+Definition: A base64-encoded container format for certificates and keys. It is the standard format used by OpenSSH.
+Usage: Used primarily by Linux, macOS, and Windows PowerShell/Command Prompt.
+AWS Context: When you create a key pair in the AWS Console, .pem is the default format.
+Permissions: On Linux/Mac, you must change the permissions using chmod 400 yourkey.pem before you can use it, or the SSH client will reject it for being "too open."
+
+== .ppk (PuTTY Private Key)
+Definition: A proprietary format created by the PuTTY team specifically for the PuTTY suite of tools.
+Usage: Used exclusively by PuTTY and WinSCP on Windows.
+AWS Context: You can choose to download your key pair as .ppk directly from the AWS Console if you know you will be using PuTTY to connect.)
+
+5. EC2 Instance Connect
+A simple and secure way to connect to your instances using a browser-based shell.
+No SSH Keys needed on your machine: It uses IAM policies to authorize users.
+Security: You don't need to share SSH keys; AWS handles the temporary key injection.
+
+** ways to connect to an EC2 instance.
+---------------------------------------------------------------------------------------------------------------  |
+| Method	          OS Support	                 Public IP Req?	         Key Pair Req?	            Open Ports?  |
+|                                                                                                                |
+| SSH	              Linux/Mac	                   Yes	                   Yes	                      Yes (22)     |
+| EIC (Standard)	  Linux 	                     Yes	                   No (managed)	              Yes (22)     |
+| EIC Endpoint	    Linux/Windows	               No	                     Yes	                      No           |
+| Session Manager	  Linux/Windows	               No	                     No 	                     	No           |
+| RDP		            Windows	                   	 Yes		                 Yes (for pass)	           	Yes (3389)   |
+---------------------------------------------------------------------------------------------------------------- |
+
+6. EC2 Purchasing Options
+Option	Best For
+
+-On-Demand =	Short-term, unpredictable workloads. Pay by the second.
+-Reserved Instances =	Steady-state usage (1 or 3-year commitment). Up to 72% discount.
+-Savings Plans =	Flexible commitment to compute usage ($/hour) across EC2, Lambda, and Fargate.
+-Spot Instances =	Spare capacity at up to 90% discount. Can be reclaimed by AWS with a 2-minute warning.
+-Dedicated Hosts =	Physical servers dedicated to your use. Good for compliance or specific software licensing (BYOL).
+
+7. Spot Instances & Spot Fleets
+Spot Instance: Best for stateless, fault-tolerant, or flexible applications (e.g., Big Data, CI/CD).
+Spot Fleet: A collection of Spot Instances (and optionally On-Demand) that attempts to meet a target capacity. It automatically selects the cheapest pools to keep costs down.
+
+
+EC2 Spot Instance Requests
+• Can get a discount of up to 90% compared to On-demand
+• Define max spot price and get the instance while current spot price < max
+• The hourly spot price varies based on offer and capacity
+• If the current spot price > your max price you can choose to stop or terminate your instance
+with a 2 minutes grace period.
+• Other strategy: Spot Block
+• “block” spot instance during a specified time frame (1 to 6 hours) without interruptions
+• In rare situations, the instance may be reclaimed
+• Used for batch jobs, data analysis, or workloads that are resilient to failures.
+• Not great for critical jobs or databases
+
+Spot Fleets
+• Spot Fleets = set of Spot Instances + (optional) On-Demand Instances
+• The Spot Fleet will try to meet the target capacity with price constraints
+• Define possible launch pools: instance type (m5.large), OS, Availability Zone
+• Can have multiple launch pools, so that the fleet can choose
+• Spot Fleet stops launching instances when reaching capacity or max cost
+• Strategies to allocate Spot Instances:
+• lowestPrice: from the pool with the lowest price (cost optimization, short workload)
+• diversified: distributed across all pools (great for availability, long workloads)
+• capacityOptimized: pool with the optimal capacity for the number of instances
+• priceCapacityOptimized (recommended): pools with highest capacity available, then select
+the pool with the lowest price (best choice for most workloads)
+• Spot Fleets allow us to automatically request Spot Instances with the lowest price
+
+8. Private vs. Public vs. Elastic IP
+Private IP: Used for communication within the VPC (Internal). Does not change on reboot.
+Public IP: Used for communication with the internet. Lost when the instance is stopped/started.
+Elastic IP (EIP): A static, public IPv4 address. You own it until you release it. Useful for masking instance failures by remapping the IP to another instance. Note: You are charged if an EIP is not attached to a running instance.
+
+AWS charges for IPv4 addresses
+Public IP
+• Starting February 1st 2024,
+there’s a charge for all Public
+IPv4 created in your account
+• $0.005 per hour of Public IPv4
+(~ $3.6 per month)
+• For new accounts in AWS, you
+have a free tier for the EC2
+service: 750 hours of Public
+IPv4 per month for the first 12
+months
+• For all other services there is
+no free tier
+
+
+9. EC2 Placement Groups
+Determines how instances are placed on the underlying hardware.
+Cluster: Instances are packed close together inside one Availability Zone (AZ). Low latency, high network throughput.
+Spread: Instances are on different physical racks. Maximizes availability; if one rack fails, others are safe.
+Partition: Instances are distributed across logical partitions; partitions do not share hardware. Good for Hadoop/Cassandra.
+• Sometimes you want control over the EC2 Instance placement strategy
+• That strategy can be defined using placement groups
+• When you create a placement group, you specify one of the following
+strategies for the group:
+• Cluster—clusters instances into a low-latency group in a single Availability Zone
+• Spread—spreads instances across underlying hardware (max 7 instances per
+group per AZ)
+• Partition—spreads instances across many different partitions (which rely on
+different sets of racks) within 
+
+Placement Groups Cluster
+Low latency
+10 Gbps network• Pros: Great network (10 Gbps bandwidth between instances with Enhanced Networking enabled - recommended)
+• Cons: If the AZ fails, all instances fails at the same time
+• Use case:
+• Big Data job that needs to complete fast
+• Application that needs extremely low latency and high network throughput
+
+Placement Groups
+Spread
+
+ Pros:
+• Can span across Availability Zones (AZ)
+• Reduced risk is simultaneous
+failure
+• EC2 Instances are on different
+physical hardware
+• Cons:
+• Limited to 7 instances per AZ per placement group
+• Use case:
+• Application that needs to maximize high availability
+• Critical Applications where each instance must be isolated
+from failure from each other
+
+Placements Groups
+Partition
+
+• Up to 7 partitions per AZ
+• Can span across multiple AZs in the same region
+• Up to 100s of EC2 instances
+• The instances in a partition do not share racks with the instances in the
+other partitions
+• A partition failure can affect many EC2 but won’t affect other partitions
+• EC2 instances get access to the partition information as metadata
+• Use cases: HDFS, HBase, Cassandra,
+Kafka
+
+
+10. Elastic Network Interface (ENI)
+A logical networking component in a VPC that represents a virtual network card.
+Can be detached from one instance and attached to another for failover.
+Contains a Primary Private IPv4, one or more Secondary IPs, and a MAC address.
+
+Elastic Network Interfaces (ENI)
+• Logical component in a VPC that represents a
+virtual network card
+• The ENI can have the following attributes:
+• Primary private IPv4, one or more secondary IPv4
+• One Elastic IP (IPv4) per private IPv4
+• One Public IPv4
+• One or more security groups
+• A MAC address
+• You can create ENI independently and attach
+them on the fly (move them) on EC2 instances
+for failover
+• Bound to a specific availability zone (AZ)
+
+11. EC2 Hibernate
+Instead of shutting down or stopping, the RAM state is saved to the EBS Root Volume.
+Benefit: The instance boots up much faster because the OS and applications don't need to reload.
+Requirement: Root volume must be an encrypted EBS volume.
+
+EC2 Hibernate – Good to know
+• Supported Instance Families – C3, C4, C5, I3, M3, M4, R3, R4, T2, T3, …
+• Instance RAM Size – must be less than 150 GB.
+• Instance Size – not supported for bare metal instances.
+• AMI – Amazon Linux 2, Linux AMI, Ubuntu, RHEL, CentOS & Windows…
+• Root Volume – must be EBS, encrypted, not instance store, and large
+• Available for On-Demand, Reserved and Spot Instances
+• An instance can NOT be hibernated more than 60 days
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+EC2 Quick Reference Summary
+1. EC2 Instance
+Summary: A resizable virtual server in the cloud that allows you to run applications without managing physical hardware.
+Key Terms: AMI (Amazon Machine Image), Instance Size, VCPU, Instance Metadata.
+
+2. EC2 Instance Types
+Summary: Different hardware configurations optimized for specific workloads like compute, memory, or storage.
+Key Terms: T-series (Burstable), R-series (RAM), C-series (Compute), P-series (Graphics/ML).
+
+3. Security Groups
+Summary: A stateful virtual firewall that controls inbound and outbound traffic at the instance level.
+Key Terms: Stateful, Allow-only Rules, Inbound/Outbound, Port 80/443/22.
+
+4. SSH (Secure Shell)
+Summary: A secure protocol used to remotely log into and manage Linux-based EC2 instances via the command line.
+Key Terms: Port 22, Key Pair (.pem/.ppk), Public Key, Private Key.
+
+5. EC2 Instance Connect
+Summary: A browser-based method to securely connect to Linux instances using IAM permissions instead of managing SSH keys locally.
+Key Terms: IAM Policy, Temporary SSH Keys, Browser-based CLI.
+
+6. EC2 Purchasing Options
+Summary: Different pricing models (On-Demand, Reserved, Spot, Dedicated) designed to balance cost and availability.
+Key Terms: Commitment, Cost Optimization, Multi-year discount, Capacity Reservation.
+
+7. Spot Instance & Spot Fleet
+Summary: Buying unused AWS capacity at a steep discount, with the trade-off that AWS can reclaim them at any time.
+Key Terms: Termination Notice (2-mins), Interruption, Max Price, Spot Request.
+
+8. Private vs. Public vs. Elastic IP
+Summary: Internal network addresses (Private), temporary internet addresses (Public), and fixed internet addresses (Elastic).
+Key Terms: Static IPv4, VPC Internal, Remapping, Internet Gateway.
+
+9. EC2 Placement Groups
+Summary: Strategies for placing instances on physical hardware to optimize for performance (Cluster) or high availability (Spread/Partition).
+Key Terms: Low Latency (Cluster), Rack Failure (Spread), Logical Partitions.
+
+10. Elastic Network Interface (ENI)
+Summary: A virtual network component that provides networking connectivity to an EC2 instance within a VPC.
+Key Terms: Primary/Secondary Private IP, MAC Address, Failover, Network Attachment.
+
+11. EC2 Hibernate
+Summary: Saves the instance's RAM state to the EBS root volume so it can resume exactly where it left off.
+Key Terms: RAM-to-Disk, Encrypted EBS, Faster Startup, Stopped State.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+EC2 Real-World Use Cases
+1. EC2 Instance
+Use Case: Hosting a Web Application.
+Scenario: A startup wants to launch a WordPress blog. They provision an EC2 instance, install an Apache web server, and host their site files. As traffic grows, they can change the instance size to handle more visitors.
+
+2. EC2 Instance Types
+Use Case: Matching Hardware to Workload.
+Scenario: * C-Series (Compute Optimized): A video streaming company uses c5 instances for heavy video transcoding and encoding tasks.
+R-Series (Memory Optimized): A high-traffic e-commerce site uses r5 instances to host a large Redis cache for fast product lookups.
+
+3. Security Groups
+Use Case: Multi-tier Architecture Security.
+Scenario: You have a Web Server and a Database Server. You configure the Web SG to allow traffic on port 443 (HTTPS) from the world. You configure the DB SG to only allow traffic on port 3306 (MySQL) specifically from the Web SG, blocking all other external access.
+
+4. SSH
+Use Case: Remote Server Configuration.
+Scenario: A DevOps engineer needs to install a security patch on a Linux server. They use a private key and an SSH client (like Terminal or PuTTY) to securely log in to the instance and run the update commands.
+
+5. EC2 Instance Connect
+Use Case: Secure Access without Key Management.
+Scenario: A large team of developers needs access to a staging server. Instead of the admin distributing .pem files to everyone (which is a security risk), they use Instance Connect. Developers log in via the AWS Console using their IAM credentials.
+
+6. EC2 Purchasing Options
+Use Case: Cost Optimization.
+Scenario: * On-Demand: Used for a new product launch where traffic is unpredictable.
+Reserved Instances (RI): Used for a company’s core internal HR portal that runs 24/7, saving up to 72% over 3 years.
+
+7. Spot Instances & Spot Fleet
+Use Case: Big Data Processing & CI/CD.
+Scenario: A research lab needs to process 1TB of genomic data. They use a Spot Fleet of 50 instances to run the job overnight. Since the task is "checkpointed" (can resume if interrupted), they save 90% in costs compared to On-Demand.
+
+8. Private vs. Public vs. Elastic IP
+Use Case: High Availability & Internal Privacy.
+Scenario: * Private IP: Your Database instance uses a private IP so it can talk to the Web server but stay invisible to the public internet.
+Elastic IP: You point your domain www.myapp.com to an Elastic IP. If your instance fails, you quickly launch a new one and "remap" the Elastic IP to the new instance so your users experience zero downtime.
+
+9. EC2 Placement Groups
+Use Case: Network Performance vs. Reliability.
+Scenario: * Cluster: Used for High-Performance Computing (HPC) where nodes need to talk to each other at sub-millisecond speeds.
+Spread: Used for a small cluster of 3 critical SQL nodes to ensure no two nodes are on the same physical rack (preventing simultaneous failure).
+
+10. Elastic Network Interface (ENI)
+Use Case: Low-Cost Service Failover.
+Scenario: You have a licensing server that is tied to a specific MAC address. If the instance dies, you detach the ENI and attach it to a standby instance. The new instance inherits the IP and MAC address, and the licensing service continues working.
+
+11. EC2 Hibernate
+Use Case: Pausing Complex Development Environments.
+Scenario: A developer uses a "Heavy" Windows instance that takes 15 minutes to load all services (IDE, local DB, Docker, etc.). At the end of the day, they Hibernate the instance. The next morning, they "Start" it, and it resumes in 30 seconds with all applications exactly where they were left.
