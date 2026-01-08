@@ -1,1 +1,348 @@
+1. vertical and horizontal scaling----------------
+
+In the world of system design and cloud computing, scaling is how a system handles an increase in workload (more users, more data, more requests).
+There are two main ways to handle this growth: Vertical Scaling and Horizontal Scaling.
+1. Vertical Scaling (Scaling Up)
+"Make the single machine stronger."
+Vertical scaling involves increasing the power of your existing server. You keep the same single server but upgrade its hardware capabilities—adding more RAM, a faster CPU, or more storage space.
+Analogy: Imagine you have a horse pulling a wagon, and the load gets too heavy. To solve this, you swap your horse for a massive, muscular prize-winning horse. It's still just one horse, but it can pull much more.
+In Cloud Terms: Changing an AWS EC2 instance from a t2.micro (small) to a m5.large (big).
+
+Pros	                                                                                  Cons
+Simplicity: No need to change your code; it runs exactly the same, just faster.        	Hard Limit: There is a maximum limit to how much RAM or CPU a single machine can have (a "ceiling").
+Less Complexity: No need to manage network communication between multiple servers.	    Single Point of Failure: If that one super-server crashes, your entire application goes down.
+Cost: Often cheaper for small-to-medium loads.	                                        Downtime: Usually requires a restart to upgrade hardware.
+
+2. Horizontal Scaling (Scaling Out)
+"Add more machines to the pool."
+Horizontal scaling involves adding more servers to your infrastructure to share the workload. Instead of one super-computer, you have a fleet of smaller, standard computers working together.
+Analogy: Imagine that same horse and wagon. Instead of buying a super-horse, you simply buy three more regular horses and hitch them all to the wagon. If one horse gets tired or sick, the others can keep pulling.
+In Cloud Terms: Adding 5 more EC2 instances behind a Load Balancer to handle a spike in web traffic.
+
+Pros	                                                                                              Cons
+Unlimited Scale: Theoretically, you can keep adding servers forever to handle infinite traffic.	    Complexity: You need a Load Balancer to distribute traffic, and your code must be written to handle running on multiple machines (stateless).
+High Availability: If one server crashes, the others take over. No downtime.	                      Data Consistency: managing data across multiple servers (e.g., databases) is much harder than on a single node.
+Flexibility: You can add or remove servers instantly based on demand (Auto-scaling).	              Network Latency: Communication between servers can be slower than communication inside a single machine.
+
+Summary Comparison
+
+Feature	Vertical Scaling (Scale Up)	Horizontal Scaling (Scale Out)
+Action	Upgrade existing hardware	Add more servers
+Limit	Hardware capacity ceiling	Virtually unlimited
+Downtime	Often required for upgrades	None (rolling updates)
+Ideal For	Databases, legacy apps, small traffic	Web apps, microservices, massive traffic
+Which one should you use?
+
+Start Vertically: For most new applications, it is easier and cheaper to start with one server and upgrade it as you grow.
+Move Horizontally: Once you need high reliability (24/7 uptime) or your traffic becomes too massive for a single machine, you switch to horizontal scaling.
+Would you like to see an example of how a Load Balancer distributes traffic between horizontally scaled servers?
+Horizontal and Vertical Scaling (How to Scale Your Application) - System Design This video provides a clear visual breakdown of both scaling strategies and explains the "diminishing returns" of vertical scaling versus the complexity of horizontal scaling.
+
+
+2. ELB--------------------
+
+An Elastic Load Balancer (ELB) acts as the "traffic cop" for your application. 
+It sits in front of your servers and automatically distributes incoming application traffic across multiple targets, 
+such as EC2 instances, containers, and IP addresses, in one or more Availability Zones (AZs).
+
+Types of ELB
+
+1. Application Load Balancer (ALB) - " The Smart One"
+Layer: Layer 7 (Application Layer - HTTP/HTTPS).
+Best For: Web applications, microservices, and container-based apps (Docker/ECS).
+
+Key Exam Features:
+Content-Based Routing: Can route traffic based on the content of the request.
+Path-based: /images goes to one server group, /api goes to another.
+Host-based: support.example.com vs app.example.com.
+Query String: Route based on headers or query parameters.
+WebSocket & HTTP/2 Support.
+Container Support: Integrates well with ECS (can map to dynamic ports).
+
+• Routing tables to different target groups:
+• Routing based on path in URL (example.com/users & example.com/posts)
+• Routing based on hostname in URL (one.example.com & other.example.com)
+• Routing based on Query String, Headers
+(example.com/users?id=123&order=false)
+• Fixed hostname (XXX.region.elb.amazonaws.com)
+• The application servers don’t see the IP of the client directly
+• The true IP of the client is inserted in the header X-Forwarded-For
+• We can also get Port (X-Forwarded-Port) and proto (X-Forwarded-Proto)
+
+2. Network Load Balancer (NLB) - "The Fast One"
+Layer: Layer 4 (Transport Layer - TCP, UDP, TLS).
+Best For: High-performance, low-latency applications, or non-HTTP protocols (like gaming or real-time streaming).
+
+Key Exam Features:
+Extreme Performance: Can handle millions of requests per second with ultra-low latency.
+Static IP: It provides a static IP address per Availability Zone (ALB does not do this; ALB gives you a DNS name).and supports assigning Elastic IP
+PrivateLink Support: Used to expose services to other VPCs via AWS PrivateLink.
+
+3. Gateway Load Balancer (GLB) - "The Security One"
+Layer: Layer 3 (Network Layer) + Layer 4.
+Best For: Deploying and managing third-party virtual network appliances (firewalls, intrusion detection systems, deep packet inspection).
+
+Key Exam Features:
+GENEVE Protocol: Uses port 6081.
+Transparency: Traffic passes through the appliance transparently (source/dest IPs are unchanged).
+(Note: There is also the Classic Load Balancer (CLB). It is legacy/old generation. Unless the exam explicitly mentions "EC2-Classic" network or legacy apps, do not choose CLB as the answer.)
+
+Key Exam Concepts & Features
+
+1. Health Checks
+The ELB periodically sends a "ping" (request) to registered instances.
+If an instance fails to respond (e.g., returns a 500 error or times out), the ELB marks it as Unhealthy and stops sending traffic to it.
+Exam Trap: If an instance is unhealthy, the ELB does not terminate it. The Auto Scaling Group terminates and replaces it.
+
+2. Cross-Zone Load Balancing
+Without it: Traffic is distributed evenly to the AZs, not the instances. (e.g., If AZ-A has 2 instances and AZ-B has 8, AZ-A instances get overloaded).
+With it: Traffic is distributed evenly across all registered instances in all enabled AZs, regardless of which zone they are in.
+Note: Enabled by default on ALB, disabled by default on NLB.
+
+3. Sticky Sessions (Session Affinity)
+Allows you to bind a user's session to a specific instance.
+Use Case: If your app stores session data locally on the web server (not recommended, but happens), the user must keep hitting that same server so they don't get logged out.
+Mechanism: Uses a cookie to track the session.
+
+4. SSL Offloading (Termination)
+The ELB handles the heavy work of decrypting HTTPS traffic.
+The traffic between the ELB and the EC2 instances can be plain HTTP (improving performance on the backend servers).
+You must install the SSL/TLS certificate on the ELB (using AWS ACM).
+
+
+* Sticky seccion.
+Sticky Sessions (also known as Session Affinity) is a feature in load balancing that ensures a specific user's request is always routed to the same backend server for the duration of their session.
+Without sticky sessions, a load balancer distributes traffic evenly (e.g., Round Robin). User A’s first request might go to Server 1, but their next request could go to Server 2.
+
+1. The Analogy
+Imagine you are at a restaurant.
+Without Sticky Sessions: Every time you want to order a drink or dessert, a different waiter comes to your table. You have to explain who you are and what you ordered previously to each new waiter.
+With Sticky Sessions: The host assigns one specific waiter to your table. That waiter remembers your name and that you already ordered an appetizer. You deal only with them for the whole meal.
+
+2. Why do we need this? (The Problem)
+HTTP is stateless. This means the server doesn't naturally remember who you are between clicks.
+Scenario: You log in to a banking website (Request 1 -> Server A). Server A saves your login info in its local memory (RAM).
+The Issue: You click "View Balance" (Request 2). The Load Balancer uses Round Robin and sends you to Server B. Server B checks its memory, doesn't find your login info, and says "Who are you? Please log in again."
+Sticky sessions solve this by forcing the Load Balancer to send Request 2 back to Server A.
+
+3. How it Works (The Cookie Mechanism)
+Sticky sessions rely on Cookies.
+First Request: The user sends a request. The Load Balancer picks a server (e.g., Server A) and forwards the traffic.
+Cookie Creation: The Load Balancer creates a special cookie (identifying Server A) and sends it back to the user's browser.
+Subsequent Requests: The user's browser automatically includes this cookie in the next request.
+Routing: The Load Balancer sees the cookie, reads "Server A," and bypasses its normal load balancing logic to send the request directly to Server A.
+
+4. AWS Specifics (Exam Context)
+In AWS, you enable sticky sessions at the Target Group level (for ALBs).
+Types of Cookies in AWS:
+Application-based Cookies: Your custom application generates the cookie. The ALB respects the duration/expiration set by your app.
+Duration-based Cookies (Generated by LB): The Load Balancer generates its own cookie named AWSALB (or AWSELB for Classic). You define how long the stickiness lasts (e.g., 1 hour).
+
+5. The Downside (Why Architects Avoid It)
+
+While sticky sessions are easy to set up, they introduce problems that cloud architects try to avoid:
+
+Problem	Explanation
+Uneven Load	If one "sticky" user downloads a massive file, they are stuck on Server A. Server A might get overloaded while Server B is sitting idle. The Load Balancer cannot move that user to Server B because they are "stuck."
+Server Failure	If Server A crashes, all the session data for users stuck to it is lost. Those users are logged out instantly.
+Auto-Scaling Issues	When you add new servers during high traffic, existing users won't move to the new servers because they are stuck to the old ones.
+6. The Better Solution (Exam "Best Practice")
+
+For a truly cloud-native, stateless application (the "right" way to do it on AWS), you should disable sticky sessions.
+How do you handle logins then? Instead of storing session data on the Web Server's RAM, you store it in a shared Distributed Cache like Amazon ElastiCache (Redis or Memcached) or a database like DynamoDB.
+Server A and Server B both check the same Redis cache to see if you are logged in.
+It doesn't matter which server you hit; the data is centralized.
+
+
+* Cross-Zone Load Balancing is a mechanism that allows a Load Balancer to distribute traffic evenly across all registered instances in all Availability Zones (AZs), rather than just the AZ where the traffic arrived.
+
+This is a "Tier 1" concept for the AWS Solutions Architect exam because it directly impacts High Availability and Cost.
+
+1. The Problem: Without Cross-Zone Load Balancing
+Imagine you have two Availability Zones (AZs):
+AZ A: Has 1 instance.
+AZ B: Has 4 instances.
+
+Incoming Traffic: 100 requests (50 go to AZ-A, 50 go to AZ-B).
+
+Result:
+The single instance in AZ-A receives 50 requests (It is overloaded).
+
+The four instances in AZ-B receive roughly 12 requests each (They are underutilized).
+2. The Solution: With Cross-Zone Load Balancing
+If you enable Cross-Zone Load Balancing, the load balancer nodes act as a single logical unit. They see the "big picture" of all 5 instances across both zones.
+
+Result:
+The Load Balancer sees 5 total healthy instances.
+It sends 20 requests to each instance, regardless of which zone they are in.
+Benefit: The load is perfectly balanced.
+
+3. Exam Cheat Sheet: Default Behavior & Cost
+
+The most important part for the exam is knowing how this behaves differently for ALB vs. NLB.
+
+Feature	Application Load Balancer (ALB)	Network Load Balancer (NLB)
+Default Status	Enabled by default.	Disabled by default.
+Data Cost	Free. You are not charged for data transfer between AZs for this traffic.	Charged. You pay standard inter-AZ data transfer rates if you enable this.
+Exam Trap	"Why is my ALB traffic balanced but my NLB traffic is uneven?" -> Answer: You forgot to enable Cross-Zone on the NLB.	
+4. When should you DISABLE it?
+
+While it sounds great, there are niche cases where you might turn it off (mostly for NLB):
+Latency Sensitive: Sending traffic from AZ-A to AZ-B takes a few milliseconds more than keeping it inside AZ-A. If you are building a high-frequency trading app, you might disable it to ensure traffic stays "local" (Zonal Affinity).
+Cost (NLB Only): If you are moving massive amounts of data (Petabytes) and don't care about perfect balance, you might disable it on an NLB to save on the data transfer fees.
+
+
+
+SSL/TSL
+
+ An SSL Certificate allows traffic between your clients and your load balancer to be encrypted in transit (in-flight encryption)
+• SSL refers to Secure Sockets Layer, used to encrypt connections
+• TLS refers to Transport Layer Security, which is a newer version
+• Nowadays, TLS certificates are mainly used, but people still refer as SSL
+• Public SSL certificates are issued by Certificate Authorities (CA)
+• Comodo, Symantec, GoDaddy, GlobalSign, Digicert, Letsencrypt, etc…
+• SSL certificates have an expiration date (you set) and must be renewed
+• The load balancer uses an X.509 certificate (SSL/TLS server certificate)
+• You can manage certificates using ACM (AWS Certificate Manager)
+• You can create upload your own certificates alternatively
+• HTTPS listener:
+• You must specify a default certificate
+• You can add an optional list of certs to support multiple domains
+• Clients can use SNI (Server Name Indication) to specify the hostname they reach
+• Ability to specify a security policy to support older versions of SSL / TLS (legacy clients)
+
+
+Server Name Indication (SNI)
+• SNI solves the problem of loading multiple SSL certificates onto one web server (to
+serve multiple websites)
+• It’s a “newer” protocol, and requires the client
+to indicate the hostname of the target server in the initial SSL handshake
+• The server will then find the correct
+I would like
+www.mycorp.com
+certificate, or return the default one
+Client ALB
+Note:
+• Only works for ALB & NLB (newer generation), CloudFront
+• Does not work for CLB (older gen)
+
+* connection Draining
+
+How It Works Technically
+When an instance (server, VM, or container) is marked for removal (due to scaling down, maintenance, or a bad health check), the load balancer initiates draining:
+Stop Routing: The load balancer stops sending new requests to that specific instance.
+Wait: It keeps the existing connections open for a specific "timeout" period (e.g., 300 seconds).
+Process: The instance continues to process these active "in-flight" requests until they are completed.
+Terminate: Once all active requests are finished (or the timeout expires), the load balancer cuts the connection fully and the instance is terminated.
+
+Why It Is Critical
+
+Prevents Errors: Users don't see 504 Gateway Timeouts or broken pipe errors during deployments.
+Data Integrity: Long-running tasks (like a file upload or a payment transaction) aren't interrupted halfway through.
+Smooth Deployments: It allows for "Zero Downtime" deployments where old versions fade out gracefully as new ones spin up.
+
+Real-World Examples
+
+1. AWS Load Balancers (ELB/ALB)
+In AWS, this is often called Deregistration Delay.
+Scenario: Auto Scaling Group scales down from 10 servers to 5.
+Action: AWS waits (default is 300 seconds) for the 5 servers to finish their current work before killing them. If you have long processes (like generating a PDF report), you might increase this setting to ensure the report finishes generating.
+
+
+2. Kubernetes (kubectl drain)
+
+
+In Kubernetes, you explicitly "drain" a node before performing maintenance on it (like upgrading the OS).
+Command: kubectl drain <node-name>
+Action:
+Cordon: Marks the node as "unschedulable" (no new Pods allowed).
+Evict: Gracefully deletes the existing Pods, giving them time to finish their work (governed by terminationGracePeriodSeconds) and spin up on a different node.
+
+
+2. ASG---------------------
+
+Think of an Auto Scaling Group (ASG) like the checkout lanes at a large supermarket.
+
+The Supermarket Analogy
+
+Normal Day (Base Capacity): On a regular Tuesday morning, the store keeps 2 lanes open. This is enough to handle the few shoppers without wasting money on idle cashiers.
+Rush Hour (Scale Out): Suddenly, it's 6 PM and everyone rushes in after work. The lines get long. The manager sees this and immediately opens 5 more lanes. This ensures customers don't wait too long.
+Closing Time (Scale In): As the rush fades and the store empties, the manager sends the extra cashiers home, going back to just 2 lanes to save money.
+Sick Cashier (Health Check): If one cashier suddenly gets sick and leaves, the manager immediately calls a replacement to ensure there are still enough lanes open.
+
+In the cloud, the Auto Scaling Group is that manager.
+
+What is it technically?
+
+An Auto Scaling Group is a collection of EC2 instances (virtual servers) that are treated as a logical unit. Its job is to automatically adjust the number of servers you have running to match the current demand of your application.
+Core Concepts
+
+Desired Capacity: The number of servers you want right now.
+Minimum Capacity: The lowest number of servers the group is allowed to have (e.g., "Always keep at least 2 servers running so the site never goes down").
+Maximum Capacity: The limit to prevent costs from spiraling out of control (e.g., "Never run more than 10 servers, no matter how busy it gets").
+
+Why do we need it?
+
+There are two main reasons:
+
+1. High Availability (Self-Healing) Even if you don't need to scale for traffic, ASG is vital for reliability. It performs Health Checks.
+Scenario: You have 2 servers. One crashes due to a hardware failure.
+ASG Action: The ASG detects the "Unhealthy" server, terminates it, and instantly launches a fresh replacement to bring the count back to 2.
+
+2. Cost Optimization (Elasticity) You stop paying for idle resources.
+Scenario: Your website traffic drops by 80% at night.
+ASG Action: The ASG removes the unneeded servers, so you aren't paying for them while you sleep.
+How does it know when to scale?
+You give the ASG a Scaling Policy (the rules):
+Target Tracking: "Keep the average CPU usage at 50%." (If it gets hotter, add servers; if it gets colder, remove them).
+Scheduled: "Every morning at 9 AM, add 5 servers." (Good for predictable traffic like school registrations).
+Predictive: Uses AI to guess when traffic will spike based on history.
+Summary Table
+
+Component	Description
+Launch Template	The "Blueprint". It tells the ASG what to create (which OS, which Instance Type, which Security Group).
+Scaling Policy	The "Brain". It tells the ASG when to add or remove servers.
+ELB Integration	ASGs usually work with a Load Balancer. When the ASG creates a new server, it automatically registers it with the Load Balancer to start receiving traffic.
+
+Scaling policies 
+
+Scaling Policies are the set of rules that tell your Auto Scaling Group (ASG) when to add servers (scale out) and when to remove them (scale in).
+Without a policy, your ASG is just a static group of servers. The policy is the intelligence that makes it "elastic."
+Here are the main types of scaling policies in AWS, explained simply:
+
+1. Target Tracking Scaling (The Smart Thermostat) 🌡️
+This is the most popular and easiest to use. You simply pick a metric and a target value, and AWS handles the rest.
+How it works: You say, "Keep the Average CPU Utilization at 50%."
+The Logic:
+If traffic spikes and CPU hits 70%, the ASG adds servers to bring the average down to 50%.
+If traffic drops and CPU hits 20%, the ASG removes servers to bring the average up to 50%.
+Analogy: It's like a thermostat in your house. You set it to 22°C. If it gets hot, the AC turns on. If it gets cold, the heater turns on. You don't tell the AC how hard to blow; you just tell it the target temperature.
+
+2. Step Scaling (The Progressive Response) 🪜
+This gives you more control than Target Tracking. It allows you to define different actions based on the severity of the alarm breach.
+How it works: You define "steps" or thresholds.
+The Logic:
+Step 1: If CPU is between 50-60%, add 1 server. (Small jump)
+Step 2: If CPU is between 60-80%, add 3 servers. (Medium jump)
+Step 3: If CPU is > 80%, add 10 servers immediately! (Panic mode)
+Analogy: Like a fire alarm system. Small smoke? Alert the manager. Visible fire? Call the fire department. Explosion? Evacuate the whole city.
+
+3. Simple Scaling (The Legacy Switch) 💡
+This is the older version of Step Scaling. It’s rarely used now because it has a flaw: it relies heavily on "Cooldown Periods."
+How it works: "If CPU > 50%, add 1 server."
+The Flaw: Once it adds a server, it locks the group (cooldown) for 5 minutes to let the new server boot up. Even if traffic doubles during that 5 minutes, the ASG ignores it until the timer is done. Step Scaling solves this by reacting immediately to bigger spikes.
+
+4. Scheduled Scaling (The Calendar) 🗓️
+This is based on time, not load.
+How it works: You set a specific date and time to change the capacity.
+Use Case: You know your traffic spikes every Monday at 9:00 AM when employees log in.
+Action: "On Monday at 8:50 AM, increase Desired Capacity to 10."
+Analogy: Setting an alarm clock to wake up before a big event.
+
+5. Predictive Scaling (The AI Fortune Teller) 🔮
+AWS uses Machine Learning to look at your history and predict future traffic.
+How it works: It analyzes your last 2 weeks of data. If it sees that traffic always spikes on Wednesday afternoon, it will proactively launch servers before the spike happens.
+The Benefit: It solves the "warm-up" problem. Reactive scaling (like Target Tracking) takes a few minutes to boot new servers. Predictive scaling has them ready and waiting when the users arrive.
+
+
 
